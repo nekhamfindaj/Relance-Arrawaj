@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Relance Clients — Fondation Arrawaj</title>
+<script src="./xlsx.full.min.js"></script>
+<script src="./chart.umd.js"></script>
+<script src="./msal-browser.min.js"></script>
+<style>
+:root{
+  --vert:#0b3d2e; --vert-clair:#12563f; --orange:#e8813a; --orange-fonce:#c9691f;
+  --bg:#f6f5f1; --carte:#ffffff; --texte:#1c2420; --texte-att:#5b665f; --ligne:#e2e1d8;
+  --rouge:#b3432f; --jaune:#c99a2e; --radius:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--texte);}
+#app{min-height:100vh;display:flex;flex-direction:column;}
+
+/* --- Login --- */
+#ecran-login{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:20px;}
+#ecran-login h1{color:var(--vert);font-size:1.4rem;}
+#ecran-login p{color:var(--texte-att);font-size:.9rem;}
+.btn{background:var(--vert);color:#fff;border:none;padding:12px 24px;border-radius:var(--radius);font-size:1rem;cursor:pointer;font-weight:600;}
+.btn:hover{background:var(--vert-clair);}
+.btn.orange{background:var(--orange);}
+.btn.orange:hover{background:var(--orange-fonce);}
+.btn.discret{background:transparent;color:var(--vert);border:1px solid var(--ligne);}
+
+/* --- Header --- */
+header{background:var(--vert);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;}
+header .titre{font-weight:700;font-size:1.05rem;}
+header .role-badge{background:var(--orange);color:#fff;font-size:.72rem;padding:3px 10px;border-radius:20px;margin-left:8px;font-weight:600;text-transform:uppercase;}
+header .user-info{display:flex;align-items:center;gap:10px;font-size:.85rem;}
+header .btn-deco{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;padding:6px 12px;border-radius:8px;font-size:.8rem;cursor:pointer;}
+
+main{flex:1;padding:16px;max-width:1100px;width:100%;margin:0 auto;}
+
+/* --- Cartes / listes --- */
+.carte{background:var(--carte);border:1px solid var(--ligne);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
+.carte h2{font-size:1rem;color:var(--vert);margin-bottom:10px;}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px;}
+.stat{background:var(--carte);border:1px solid var(--ligne);border-radius:var(--radius);padding:12px;text-align:center;}
+.stat .valeur{font-size:1.5rem;font-weight:700;color:var(--vert);}
+.stat .label{font-size:.72rem;color:var(--texte-att);text-transform:uppercase;letter-spacing:.03em;}
+
+.client-item{border:1px solid var(--ligne);border-radius:var(--radius);padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+.client-item .nom{font-weight:600;}
+.client-item .meta{font-size:.78rem;color:var(--texte-att);}
+.badge{font-size:.68rem;padding:2px 8px;border-radius:20px;font-weight:600;text-transform:uppercase;}
+.badge.att{background:#fff2e0;color:var(--orange-fonce);}
+.badge.rdv{background:#e5f2ea;color:var(--vert);}
+.badge.rappel{background:#fdf6e0;color:var(--jaune);}
+
+input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--ligne);border-radius:8px;font-size:.9rem;margin-bottom:8px;}
+label{font-size:.8rem;color:var(--texte-att);font-weight:600;display:block;margin-bottom:4px;}
+.tel-link{color:var(--orange-fonce);font-weight:700;text-decoration:none;}
+
+/* --- Formulaire de saisie appel --- */
+.etapes{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.etapes button{flex:1;min-width:130px;padding:10px;border:1px solid var(--ligne);background:#fff;border-radius:8px;cursor:pointer;font-size:.85rem;}
+.etapes button.actif{background:var(--vert);color:#fff;border-color:var(--vert);}
+.zone-detail{border-top:1px dashed var(--ligne);margin-top:10px;padding-top:10px;}
+.hidden{display:none !important;}
+
+/* --- Nav rôle --- */
+nav.tabs{display:flex;gap:6px;margin-bottom:14px;border-bottom:2px solid var(--ligne);}
+nav.tabs button{background:none;border:none;padding:10px 14px;font-size:.88rem;color:var(--texte-att);cursor:pointer;border-bottom:3px solid transparent;font-weight:600;}
+nav.tabs button.actif{color:var(--vert);border-bottom-color:var(--orange);}
+
+.msg-vide{text-align:center;color:var(--texte-att);padding:30px;font-size:.9rem;}
+.msg-erreur{background:#fdeceb;color:var(--rouge);padding:10px 14px;border-radius:8px;font-size:.85rem;margin-bottom:10px;}
+.msg-succes{background:#e5f2ea;color:var(--vert);padding:10px 14px;border-radius:8px;font-size:.85rem;margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="ecran-login">
+    <h1>Relance Clients — Fondation Arrawaj</h1>
+    <p>Connectez-vous avec votre compte professionnel</p>
+    <button class="btn" id="btn-login">Se connecter</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG — à ajuster une fois les tables Dataverse créées
+   ============================================================ */
+const MSAL_CONFIG = {
+  auth: {
+    clientId: "725c7e66-a235-4672-b09d-3eede78c1b1c",       // App CGA Arrawaj réutilisée
+    authority: "https://login.microsoftonline.com/93d6c57e-29a2-4b04-847c-6915c6a388a0",
+    redirectUri: "https://nekhamfindaj.github.io/Relance-Arrawaj/"
+  },
+  cache: { cacheLocation: "sessionStorage" }
+};
+const DATAVERSE_URL = "https://org18dd8097.crm4.dynamics.com";
+const DATAVERSE_SCOPE = `${DATAVERSE_URL}/.default`;
+
+// ⚠️ Noms de tables à confirmer après création manuelle dans Power Apps
+// (le nom pluriel exact dépend de la règle de pluralisation Dataverse — à vérifier dans "Détails de la table")
+const TABLES = {
+  clients: "cr2c5_arw_relance_clientses",
+  appels: "cr2c5_arw_appelses",
+  users: "cr2c5_arw_userses"
+};
+
+/* ============================================================
+   AUTH MSAL
+   ============================================================ */
+const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
+let currentAccount = null;
+let currentUser = null; // { email, nom, role, agence }
+
+async function initAuth() {
+  try {
+    const resp = await Promise.race([
+      msalInstance.handleRedirectPromise(),
+      new Promise(res => setTimeout(() => res(null), 2000))
+    ]);
+    if (resp && resp.account) currentAccount = resp.account;
+  } catch (e) { console.error("Erreur redirect MSAL:", e); }
+
+  const accounts = msalInstance.getAllAccounts();
+  if (!currentAccount && accounts.length > 0) currentAccount = accounts[0];
+
+  if (currentAccount) {
+    await chargerProfilUtilisateur();
+  } else {
+    document.getElementById("btn-login").addEventListener("click", () => {
+      msalInstance.loginRedirect({ scopes: [DATAVERSE_SCOPE] });
+    });
+  }
+}
+
+async function getToken() {
+  const req = { scopes: [DATAVERSE_SCOPE], account: currentAccount };
+  try {
+    const res = await msalInstance.acquireTokenSilent(req);
+    return res.accessToken;
+  } catch (e) {
+    const res = await msalInstance.acquireTokenRedirect(req);
+    return null; // redirection en cours
+  }
+}
+
+async function dvFetch(path, options = {}) {
+  const token = await getToken();
+  const res = await fetch(`${DATAVERSE_URL}/api/data/v9.2/${path}`, {
+    ...options,
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "OData-MaxVersion": "4.0",
+      "OData-Version": "4.0",
+      "Accept": "application/json",
+      "Prefer": "odata.maxpagesize=500",
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Dataverse ${res.status}: ${txt.slice(0,200)}`);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+async function chargerProfilUtilisateur() {
+  try {
+    const email = currentAccount.username.toLowerCase();
+    const data = await dvFetch(`${TABLES.users}?$filter=cr2c5_arw_email eq '${email}'`);
+    if (!data.value || data.value.length === 0) {
+      afficherErreurProfil(email);
+      return;
+    }
+    const u = data.value[0];
+    const roles = { 0: "admin", 1: "crc", 2: "dr", 3: "rga", 4: "ca" };
+    currentUser = {
+      id: u.cr2c5_arw_usersid,
+      email: u.cr2c5_arw_email,
+      nom: u.cr2c5_arw_nom,
+      role: roles[u.cr2c5_arw_role] || "crc",
+      agence: u.cr2c5_arw_agence,
+      quota: u.cr2c5_arw_quota_jour
+    };
+    demarrerApp();
+  } catch (e) {
+    console.error(e);
+    afficherErreurProfil(currentAccount.username);
+  }
+}
+
+function afficherErreurProfil(email) {
+  document.getElementById("app").innerHTML = `
+    <div id="ecran-login">
+      <h1>Profil introuvable</h1>
+      <p>Aucun utilisateur trouvé pour <strong>${email}</strong> dans la table des utilisateurs.<br>
+      Contactez l'administrateur pour être ajouté.</p>
+      <button class="btn discret" onclick="location.reload()">Réessayer</button>
+    </div>`;
+}
+
+/* ============================================================
+   DÉMARRAGE APP — routage par rôle
+   ============================================================ */
+function demarrerApp() {
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <header>
+      <div class="titre">Relance Clients <span class="role-badge">${currentUser.role}</span></div>
+      <div class="user-info">
+        <span>${currentUser.nom}</span>
+        <button class="btn-deco" id="btn-logout">Déconnexion</button>
+      </div>
+    </header>
+    <main id="zone-principale"></main>
+  `;
+  document.getElementById("btn-logout").addEventListener("click", () => msalInstance.logoutRedirect());
+
+  const zone = document.getElementById("zone-principale");
+  if (currentUser.role === "crc") renderEcranCRC(zone);
+  else if (currentUser.role === "admin") renderEcranAdmin(zone);
+  else if (currentUser.role === "dr") renderEcranDR(zone);
+  else renderEcranBientot(zone);
+}
+
+function renderEcranBientot(zone) {
+  zone.innerHTML = `<div class="msg-vide">Écran ${currentUser.role.toUpperCase()} — bientôt disponible (phase 2).</div>`;
+}
+
+/* ============================================================
+   ÉCRAN CRC — file du jour + recherche + saisie appel
+   ============================================================ */
+async function renderEcranCRC(zone) {
+  zone.innerHTML = `
+    <nav class="tabs">
+      <button class="actif" data-tab="file">Ma file du jour</button>
+      <button data-tab="recherche">Recherche libre</button>
+    </nav>
+    <div id="contenu-crc"></div>
+  `;
+  const contenu = document.getElementById("contenu-crc");
+  const tabs = zone.querySelectorAll("nav.tabs button");
+  tabs.forEach(b => b.addEventListener("click", () => {
+    tabs.forEach(x => x.classList.remove("actif"));
+    b.classList.add("actif");
+    if (b.dataset.tab === "file") chargerFileDuJour(contenu);
+    else chargerRecherche(contenu);
+  }));
+  chargerFileDuJour(contenu);
+}
+
+async function chargerFileDuJour(contenu) {
+  contenu.innerHTML = `<div class="msg-vide">Chargement...</div>`;
+  try {
+    const filtre = `cr2c5_arw_operateur_assigne eq '${currentUser.id}' and cr2c5_arw_statut eq 11`; // ATTRIBUE
+    const data = await dvFetch(`${TABLES.clients}?$filter=${encodeURIComponent(filtre)}&$orderby=cr2c5_arw_priorite_score desc`);
+    if (!data.value || data.value.length === 0) {
+      contenu.innerHTML = `<div class="msg-vide">Aucun client dans votre file actuellement.</div>`;
+      return;
+    }
+    contenu.innerHTML = data.value.map(c => templateClientItem(c)).join("");
+    attacherEcoutesFiche(contenu, data.value);
+  } catch (e) {
+    contenu.innerHTML = `<div class="msg-erreur">Erreur de chargement : ${e.message}</div>`;
+  }
+}
+
+function templateClientItem(c) {
+  return `
+    <div class="client-item" data-id="${c.cr2c5_arw_relance_clientsid}">
+      <div>
+        <div class="nom">${c.cr2c5_arw_nomclient || ""} ${c.cr2c5_arw_prenomclient || ""}</div>
+        <div class="meta">${c.cr2c5_arw_agence || ""} · Échéance ${c.cr2c5_arw_finecheance ? new Date(c.cr2c5_arw_finecheance).toLocaleDateString('fr-FR') : "-"} · <a class="tel-link" href="tel:${c.cr2c5_arw_gsm}">${c.cr2c5_arw_gsm || "-"}</a></div>
+      </div>
+      <button class="btn orange btn-traiter" data-id="${c.cr2c5_arw_relance_clientsid}">Traiter l'appel</button>
+    </div>`;
+}
+
+async function chargerRecherche(contenu) {
+  contenu.innerHTML = `
+    <div class="carte">
+      <label>Rechercher un client (nom, CIN ou n° demande)</label>
+      <input type="text" id="input-recherche" placeholder="Ex: NADI ou CB320282">
+      <button class="btn" id="btn-rechercher">Rechercher</button>
+    </div>
+    <div id="resultats-recherche"></div>
+  `;
+  document.getElementById("btn-rechercher").addEventListener("click", async () => {
+    const q = document.getElementById("input-recherche").value.trim();
+    const res = document.getElementById("resultats-recherche");
+    if (!q) return;
+    res.innerHTML = `<div class="msg-vide">Recherche...</div>`;
+    try {
+      const filtre = `contains(cr2c5_arw_nomclient,'${q}') or contains(cr2c5_arw_cin,'${q}') or contains(cr2c5_arw_numdemande,'${q}')`;
+      const data = await dvFetch(`${TABLES.clients}?$filter=${encodeURIComponent(filtre)}`);
+      if (!data.value || data.value.length === 0) {
+        res.innerHTML = `<div class="msg-vide">Aucun résultat.</div>`;
+        return;
+      }
+      res.innerHTML = data.value.map(c => templateClientItem(c)).join("");
+      attacherEcoutesFiche(res, data.value);
+    } catch (e) {
+      res.innerHTML = `<div class="msg-erreur">Erreur : ${e.message}</div>`;
+    }
+  });
+}
+
+function attacherEcoutesFiche(container, clients) {
+  container.querySelectorAll(".btn-traiter").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const c = clients.find(x => x.cr2c5_arw_relance_clientsid === btn.dataset.id);
+      ouvrirFormulaireAppel(c);
+    });
+  });
+}
+
+/* ============================================================
+   FORMULAIRE DE SAISIE APPEL — logique conditionnelle complète
+   ============================================================ */
+function ouvrirFormulaireAppel(client) {
+  const zone = document.getElementById("zone-principale");
+  const overlay = document.createElement("div");
+  overlay.innerHTML = `
+    <div class="carte">
+      <h2>${client.cr2c5_arw_nomclient} ${client.cr2c5_arw_prenomclient} — ${client.cr2c5_arw_agence}</h2>
+      <p style="margin-bottom:10px;"><a class="tel-link" href="tel:${client.cr2c5_arw_gsm}">📞 ${client.cr2c5_arw_gsm}</a></p>
+
+      <label>Nature de l'appel</label>
+      <div class="etapes" id="choix-nature">
+        <button data-val="NON_ARGUMENTE">Non argumenté</button>
+        <button data-val="ARGUMENTE">Argumenté</button>
+      </div>
+
+      <div id="zone-non-argumente" class="zone-detail hidden">
+        <label>Motif</label>
+        <select id="motif-non-argumente">
+          <option value="INJOIGNABLE">Client injoignable</option>
+          <option value="NUM_ERRONE">Numéro erroné</option>
+          <option value="NON_DISPONIBLE">Client non disponible</option>
+        </select>
+      </div>
+
+      <div id="zone-argumente" class="zone-detail hidden">
+        <label>Résultat</label>
+        <div class="etapes" id="choix-resultat">
+          <button data-val="HORS_ZONE">Hors zone</button>
+          <button data-val="NON_ELIGIBLE">Non éligible</button>
+          <button data-val="INTERESSE">Intéressé</button>
+          <button data-val="NON_INTERESSE">Non intéressé</button>
+        </div>
+
+        <div id="detail-hors-zone" class="zone-detail hidden">
+          <label>Agence la plus proche du lieu de résidence</label>
+          <input type="text" id="input-agence-proche" placeholder="Nom de l'agence">
+        </div>
+
+        <div id="detail-non-eligible" class="zone-detail hidden">
+          <label>Motif de non-éligibilité</label>
+          <select id="motif-non-eligible">
+            <option value="AGE">Âge client</option>
+            <option value="BESOIN_HORS_OFFRE">Besoin de financement hors offre</option>
+            <option value="ACTIVITE_NON_ELIGIBLE">Activité non éligible</option>
+            <option value="AUTRE">Autre</option>
+          </select>
+        </div>
+
+        <div id="detail-interesse" class="zone-detail hidden">
+          <label>Délai d'intérêt</label>
+          <select id="delai-interet">
+            <option value="IMMEDIAT">Immédiatement</option>
+            <option value="1_MOIS">Dans 1 mois</option>
+            <option value="2_MOIS">Dans 2 mois</option>
+            <option value="3_MOIS">Dans 3 mois</option>
+          </select>
+          <div id="detail-rdv" class="zone-detail hidden">
+            <label>Date et heure du rendez-vous</label>
+            <input type="datetime-local" id="input-date-rdv">
+          </div>
+        </div>
+
+        <div id="detail-non-interesse" class="zone-detail hidden">
+          <label>Motif</label>
+          <select id="motif-non-interesse">
+            <option value="TARIFICATION">Offre / tarification</option>
+            <option value="PAS_BESOIN">Pas de besoin dans l'immédiat</option>
+            <option value="AUTRE">Autre</option>
+          </select>
+        </div>
+      </div>
+
+      <label>Commentaire libre</label>
+      <textarea id="commentaire-libre" rows="2"></textarea>
+
+      <div id="zone-erreur-form"></div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn discret" id="btn-annuler">Annuler</button>
+        <button class="btn orange" id="btn-valider">Enregistrer</button>
+      </div>
+    </div>
+  `;
+  zone.prepend(overlay);
+  overlay.scrollIntoView({ behavior: "smooth" });
+
+  let nature = null, resultat = null;
+  const q = sel => overlay.querySelector(sel);
+
+  q("#choix-nature").addEventListener("click", e => {
+    if (e.target.tagName !== "BUTTON") return;
+    nature = e.target.dataset.val;
+    q("#choix-nature").querySelectorAll("button").forEach(b => b.classList.remove("actif"));
+    e.target.classList.add("actif");
+    q("#zone-non-argumente").classList.toggle("hidden", nature !== "NON_ARGUMENTE");
+    q("#zone-argumente").classList.toggle("hidden", nature !== "ARGUMENTE");
+  });
+
+  q("#choix-resultat").addEventListener("click", e => {
+    if (e.target.tagName !== "BUTTON") return;
+    resultat = e.target.dataset.val;
+    q("#choix-resultat").querySelectorAll("button").forEach(b => b.classList.remove("actif"));
+    e.target.classList.add("actif");
+    ["hors-zone","non-eligible","interesse","non-interesse"].forEach(id => {
+      q(`#detail-${id}`).classList.toggle("hidden", `${id.toUpperCase().replace(/-/g,'_')}` !== resultat);
+    });
+  });
+
+  q("#delai-interet").addEventListener("change", e => {
+    q("#detail-rdv").classList.toggle("hidden", e.target.value !== "IMMEDIAT");
+  });
+
+  q("#btn-annuler").addEventListener("click", () => overlay.remove());
+
+  q("#btn-valider").addEventListener("click", async () => {
+    const err = q("#zone-erreur-form");
+    err.innerHTML = "";
+    if (!nature) { err.innerHTML = `<div class="msg-erreur">Sélectionnez la nature de l'appel.</div>`; return; }
+    if (nature === "ARGUMENTE" && !resultat) { err.innerHTML = `<div class="msg-erreur">Sélectionnez un résultat.</div>`; return; }
+
+    try {
+      await enregistrerAppel(client, nature, resultat, overlay);
+      overlay.remove();
+      chargerFileDuJour(document.getElementById("contenu-crc"));
+    } catch (e) {
+      err.innerHTML = `<div class="msg-erreur">Erreur d'enregistrement : ${e.message}</div>`;
+    }
+  });
+}
+
+async function enregistrerAppel(client, nature, resultat, overlay) {
+  const q = sel => overlay.querySelector(sel);
+  const commentaire = q("#commentaire-libre").value;
+
+  // 1) Créer la ligne d'historique cr2c5_arw_appels
+  const appelBody = {
+    "cr2c5_arw_client@odata.bind": `/${TABLES.clients}(${client.cr2c5_arw_relance_clientsid})`,
+    cr2c5_arw_operateur: currentUser.nom,
+    cr2c5_arw_date_appel: new Date().toISOString(),
+    cr2c5_arw_nature_appel: nature === "ARGUMENTE" ? 100 : 101,
+    cr2c5_arw_commentaire: commentaire
+  };
+  if (nature === "NON_ARGUMENTE") {
+    appelBody.cr2c5_arw_motif_non_argumente = q("#motif-non-argumente").value;
+  } else {
+    appelBody.cr2c5_arw_resultat_argumente = resultat;
+    if (resultat === "HORS_ZONE") appelBody.cr2c5_arw_agence_reaffectee = q("#input-agence-proche").value;
+    if (resultat === "NON_ELIGIBLE") appelBody.cr2c5_arw_motif_non_eligibilite = q("#motif-non-eligible").value;
+    if (resultat === "NON_INTERESSE") appelBody.cr2c5_arw_motif_non_interet = q("#motif-non-interesse").value;
+    if (resultat === "INTERESSE") {
+      appelBody.cr2c5_arw_delai_interet = q("#delai-interet").value;
+      if (q("#delai-interet").value === "IMMEDIAT") appelBody.cr2c5_arw_date_rdv = new Date(q("#input-date-rdv").value).toISOString();
+    }
+  }
+  await dvFetch(`${TABLES.appels}`, { method: "POST", body: JSON.stringify(appelBody) });
+
+  // 2) Mettre à jour le statut du client selon la logique métier
+  const updateBody = {};
+  if (nature === "NON_ARGUMENTE") {
+    updateBody.cr2c5_arw_nb_tentatives = (client.cr2c5_arw_nb_tentatives || 0) + 1;
+    updateBody.cr2c5_arw_statut = 12; // INJOIGNABLE — reste dans le pool
+  } else if (resultat === "HORS_ZONE") {
+    updateBody.cr2c5_arw_agence_reaffectee = q("#input-agence-proche").value;
+    updateBody.cr2c5_arw_statut = 13; // HORS_ZONE_REAFFECTE
+    updateBody.cr2c5_arw_operateur_assigne = null; // libéré pour réattribution
+  } else if (resultat === "NON_ELIGIBLE" || resultat === "NON_INTERESSE") {
+    updateBody.cr2c5_arw_statut = resultat === "NON_ELIGIBLE" ? 14 : 18; // CLOTURE négatif (NON_ELIGIBLE / NON_INTERESSE)
+  } else if (resultat === "INTERESSE") {
+    if (q("#delai-interet").value === "IMMEDIAT") {
+      updateBody.cr2c5_arw_statut = 16; // RDV_FIXE
+      updateBody.cr2c5_arw_date_rappel_prevue = null;
+    } else {
+      updateBody.cr2c5_arw_statut = 15; // INTERESSE_RAPPEL
+      const mois = { "1_MOIS": 1, "2_MOIS": 2, "3_MOIS": 3 }[q("#delai-interet").value];
+      const d = new Date(); d.setMonth(d.getMonth() + mois);
+      updateBody.cr2c5_arw_date_rappel_prevue = d.toISOString().slice(0,10);
+      updateBody.cr2c5_arw_operateur_assigne = null; // repasse dans le pool à échéance
+    }
+  }
+  await dvFetch(`${TABLES.clients}(${client.cr2c5_arw_relance_clientsid})`, { method: "PATCH", body: JSON.stringify(updateBody) });
+}
+
+/* ============================================================
+   ÉCRAN ADMIN — import + dashboard (à enrichir en phase suivante)
+   ============================================================ */
+function renderEcranAdmin(zone) {
+  zone.innerHTML = `
+    <div class="carte">
+      <h2>Import base clients</h2>
+      <label>Fichier Excel (structure standard)</label>
+      <input type="file" id="input-fichier" accept=".xlsx,.xls">
+      <button class="btn" id="btn-importer">Importer</button>
+      <div id="statut-import"></div>
+    </div>
+    <div class="stat-grid" id="stats-admin"></div>
+  `;
+  document.getElementById("btn-importer").addEventListener("click", importerFichierClients);
+}
+
+async function importerFichierClients() {
+  const fichier = document.getElementById("input-fichier").files[0];
+  const statutDiv = document.getElementById("statut-import");
+  if (!fichier) { statutDiv.innerHTML = `<div class="msg-erreur">Sélectionnez un fichier.</div>`; return; }
+  statutDiv.innerHTML = `<div class="msg-vide">Lecture du fichier...</div>`;
+
+  const buf = await fichier.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array", cellDates: true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { raw: true, defval: "" });
+
+  let importes = 0, doublons = 0, erreurs = 0;
+  for (const r of rows) {
+    try {
+      const body = {
+        cr2c5_arw_direction: r.DIRECTION, cr2c5_arw_directeursucursale: r.DIRECTEURSUCURSALE,
+        cr2c5_arw_codeagence: r.CODEAGENCE, cr2c5_arw_agence: r.AGENCE,
+        cr2c5_arw_codeagentcredit: r.CODEAGENTCREDIT, cr2c5_arw_agentdecredit: r.AGENTDECREDIT,
+        cr2c5_arw_numdemande: r.NUMDEMANDE, cr2c5_arw_idclient: r.IDCLIENT,
+        cr2c5_arw_nomclient: r.NOMCLIENT, cr2c5_arw_prenomclient: r.PRENOMCLIENT,
+        cr2c5_arw_adresse: r.ADRESSE, cr2c5_arw_gsm: String(r.GSM || ""), cr2c5_arw_cin: r.CIN,
+        cr2c5_arw_codesousproduit: r.CODESOUSPRODUIT,
+        cr2c5_arw_finecheance: r.FINECHEANCE instanceof Date ? r.FINECHEANCE.toISOString().slice(0,10) : null,
+        cr2c5_arw_montantdeblocage: r.MONTANTDEBLOCAGE, cr2c5_arw_terme: r.TERME, cr2c5_arw_mntecheance: r.MNTECHEANCE,
+        cr2c5_arw_activite: r["Activité"],
+        cr2c5_arw_agence_origine: r.AGENCE,
+        cr2c5_arw_statut: 10 // A_TRAITER
+      };
+      // Vérifier doublon par numéro de demande avant insertion
+      const existe = await dvFetch(`${TABLES.clients}?$filter=cr2c5_arw_numdemande eq '${r.NUMDEMANDE}'&$select=cr2c5_arw_relance_clientsid`);
+      if (existe.value && existe.value.length > 0) { doublons++; continue; }
+      await dvFetch(`${TABLES.clients}`, { method: "POST", body: JSON.stringify(body) });
+      importes++;
+    } catch (e) { erreurs++; console.error(e); }
+  }
+  statutDiv.innerHTML = `<div class="msg-succes">Import terminé : ${importes} client(s) importé(s), ${doublons} doublon(s) ignoré(s), ${erreurs} erreur(s).</div>`;
+}
+
+/* ============================================================
+   ÉCRAN DR — RDV fixés + export Excel
+   ============================================================ */
+async function renderEcranDR(zone) {
+  zone.innerHTML = `<div class="msg-vide">Chargement des rendez-vous...</div>`;
+  try {
+    const filtre = `cr2c5_arw_statut eq 16`; // RDV_FIXE
+    const data = await dvFetch(`${TABLES.clients}?$filter=${encodeURIComponent(filtre)}`);
+    const liste = data.value || [];
+    if (liste.length === 0) {
+      zone.innerHTML = `<div class="msg-vide">Aucun rendez-vous confirmé à transmettre pour le moment.</div>`;
+      return;
+    }
+    zone.innerHTML = `
+      <div class="carte">
+        <h2>Rendez-vous confirmés (${liste.length})</h2>
+        <button class="btn orange" id="btn-export">Télécharger la liste (Excel)</button>
+      </div>
+      <div id="liste-rdv"></div>
+    `;
+    document.getElementById("liste-rdv").innerHTML = liste.map(c => `
+      <div class="client-item">
+        <div>
+          <div class="nom">${c.cr2c5_arw_nomclient} ${c.cr2c5_arw_prenomclient} <span class="badge rdv">RDV</span></div>
+          <div class="meta">${c.cr2c5_arw_agence} · <a class="tel-link" href="tel:${c.cr2c5_arw_gsm}">${c.cr2c5_arw_gsm}</a></div>
+        </div>
+      </div>`).join("");
+
+    document.getElementById("btn-export").addEventListener("click", async () => {
+      const exportData = liste.map(c => ({
+        Agence: c.cr2c5_arw_agence, Client: `${c.cr2c5_arw_nomclient} ${c.cr2c5_arw_prenomclient}`,
+        GSM: c.cr2c5_arw_gsm, "N° demande": c.cr2c5_arw_numdemande, "Date RDV": c.cr2c5_arw_date_rdv
+      }));
+      const wsExport = XLSX.utils.json_to_sheet(exportData);
+      const wbExport = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wbExport, wsExport, "RDV");
+      XLSX.writeFile(wbExport, `RDV_Relance_${new Date().toISOString().slice(0,10)}.xlsx`);
+
+      // Marquer comme exportés
+      for (const c of liste) {
+        await dvFetch(`${TABLES.clients}(${c.cr2c5_arw_relance_clientsid})`, {
+          method: "PATCH",
+          body: JSON.stringify({ cr2c5_arw_statut: 17, cr2c5_arw_date_export_dr: new Date().toISOString() }) // EXPORTE_DR
+        });
+      }
+      renderEcranDR(zone);
+    });
+  } catch (e) {
+    zone.innerHTML = `<div class="msg-erreur">Erreur : ${e.message}</div>`;
+  }
+}
+
+initAuth();
+</script>
+</body>
+</html>
