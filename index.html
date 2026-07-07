@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Relance Clients — Fondation Arrawaj</title>
+<script src="./xlsx.full.min.js"></script>
+<script src="./chart.umd.js"></script>
+<script src="./msal-browser.min.js"></script>
+<style>
+:root{
+  --vert:#0b3d2e; --vert-clair:#12563f; --orange:#e8813a; --orange-fonce:#c9691f;
+  --bg:#f6f5f1; --carte:#ffffff; --texte:#1c2420; --texte-att:#5b665f; --ligne:#e2e1d8;
+  --rouge:#b3432f; --jaune:#c99a2e; --radius:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--texte);}
+#app{min-height:100vh;display:flex;flex-direction:column;}
+
+/* --- Login --- */
+#ecran-login{flex:1;display:flex;align-items:center;justify-content:center;padding:20px;
+  background:radial-gradient(circle at 15% 15%, #12563f 0%, #0b3d2e 45%, #072a1f 100%);}
+.login-panel{background:var(--carte);border-radius:20px;overflow:hidden;max-width:820px;width:100%;
+  display:flex;box-shadow:0 30px 60px -20px rgba(0,0,0,.4);}
+.login-brand{flex:1.1;background:linear-gradient(160deg, var(--vert) 0%, #072a1f 100%);
+  color:#fff;padding:44px 36px;display:flex;flex-direction:column;gap:18px;position:relative;overflow:hidden;}
+.login-brand::after{content:"";position:absolute;right:-60px;bottom:-60px;width:220px;height:220px;
+  border-radius:50%;border:1px solid rgba(255,255,255,.08);}
+.login-brand::before{content:"";position:absolute;right:-20px;bottom:-20px;width:140px;height:140px;
+  border-radius:50%;border:1px solid rgba(255,255,255,.1);}
+.login-badge{width:52px;height:52px;border-radius:14px;background:rgba(232,129,58,.18);
+  display:flex;align-items:center;justify-content:center;color:var(--orange);}
+.login-eyebrow{font-size:.7rem;letter-spacing:.14em;color:rgba(255,255,255,.55);font-weight:700;text-transform:uppercase;}
+.login-brand h1{font-size:1.5rem;font-weight:700;margin:0;line-height:1.2;}
+.login-tagline{font-size:.88rem;color:rgba(255,255,255,.75);line-height:1.55;max-width:32ch;}
+.login-features{list-style:none;display:flex;flex-direction:column;gap:10px;margin-top:auto;padding-top:14px;}
+.login-features li{font-size:.82rem;color:rgba(255,255,255,.85);display:flex;align-items:center;gap:10px;}
+.login-features li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--orange);flex-shrink:0;}
+.login-action{flex:1;padding:44px 36px;display:flex;flex-direction:column;justify-content:center;gap:16px;}
+.login-instruction{font-size:.92rem;color:var(--texte);font-weight:600;}
+.login-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:13px 20px;}
+.login-note{font-size:.76rem;color:var(--texte-att);line-height:1.5;}
+.login-loading{display:flex;align-items:center;gap:10px;font-size:.85rem;color:var(--texte-att);}
+.spinner{width:16px;height:16px;border:2px solid var(--ligne);border-top-color:var(--vert);border-radius:50%;
+  animation:tourner .7s linear infinite;flex-shrink:0;}
+@keyframes tourner{to{transform:rotate(360deg);}}
+@media (prefers-reduced-motion: reduce){.spinner{animation:none;}}
+@media (max-width:640px){
+  .login-panel{flex-direction:column;max-width:420px;}
+  .login-brand{padding:32px 26px;}
+  .login-action{padding:32px 26px;}
+  .login-features{display:none;}
+}
+
+.btn{background:var(--vert);color:#fff;border:none;padding:12px 24px;border-radius:var(--radius);font-size:1rem;cursor:pointer;font-weight:600;}
+.btn:hover{background:var(--vert-clair);}
+.btn.orange{background:var(--orange);}
+.btn.orange:hover{background:var(--orange-fonce);}
+.btn.discret{background:transparent;color:var(--vert);border:1px solid var(--ligne);}
+
+/* --- Header --- */
+header{background:var(--vert);color:#fff;padding:14px 20px;display:flex;justify-content:space-between;align-items:center;}
+header .titre{font-weight:700;font-size:1.05rem;}
+header .role-badge{background:var(--orange);color:#fff;font-size:.72rem;padding:3px 10px;border-radius:20px;margin-left:8px;font-weight:600;text-transform:uppercase;}
+header .user-info{display:flex;align-items:center;gap:10px;font-size:.85rem;}
+header .btn-deco{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;padding:6px 12px;border-radius:8px;font-size:.8rem;cursor:pointer;}
+
+main{flex:1;padding:16px;max-width:1100px;width:100%;margin:0 auto;}
+
+/* --- Cartes / listes --- */
+.carte{background:var(--carte);border:1px solid var(--ligne);border-radius:var(--radius);padding:16px;margin-bottom:14px;}
+.carte h2{font-size:1rem;color:var(--vert);margin-bottom:10px;}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:16px;}
+.stat{background:var(--carte);border:1px solid var(--ligne);border-radius:var(--radius);padding:12px;text-align:center;}
+.stat .valeur{font-size:1.5rem;font-weight:700;color:var(--vert);}
+.stat .label{font-size:.72rem;color:var(--texte-att);text-transform:uppercase;letter-spacing:.03em;}
+
+.client-item{border:1px solid var(--ligne);border-radius:var(--radius);padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+.client-item .nom{font-weight:600;}
+.client-item .meta{font-size:.78rem;color:var(--texte-att);}
+.badge{font-size:.68rem;padding:2px 8px;border-radius:20px;font-weight:600;text-transform:uppercase;}
+.badge.att{background:#fff2e0;color:var(--orange-fonce);}
+.badge.rdv{background:#e5f2ea;color:var(--vert);}
+.badge.rappel{background:#fdf6e0;color:var(--jaune);}
+
+input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--ligne);border-radius:8px;font-size:.9rem;margin-bottom:8px;}
+label{font-size:.8rem;color:var(--texte-att);font-weight:600;display:block;margin-bottom:4px;}
+.tel-link{color:var(--orange-fonce);font-weight:700;text-decoration:none;}
+
+/* --- Formulaire de saisie appel --- */
+.etapes{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+.etapes button{flex:1;min-width:130px;padding:10px;border:1px solid var(--ligne);background:#fff;border-radius:8px;cursor:pointer;font-size:.85rem;}
+.etapes button.actif{background:var(--vert);color:#fff;border-color:var(--vert);}
+.zone-detail{border-top:1px dashed var(--ligne);margin-top:10px;padding-top:10px;}
+.hidden{display:none !important;}
+
+/* --- Nav rôle --- */
+nav.tabs{display:flex;gap:6px;margin-bottom:14px;border-bottom:2px solid var(--ligne);}
+nav.tabs button{background:none;border:none;padding:10px 14px;font-size:.88rem;color:var(--texte-att);cursor:pointer;border-bottom:3px solid transparent;font-weight:600;}
+nav.tabs button.actif{color:var(--vert);border-bottom-color:var(--orange);}
+
+.msg-vide{text-align:center;color:var(--texte-att);padding:30px;font-size:.9rem;}
+.msg-erreur{background:#fdeceb;color:var(--rouge);padding:10px 14px;border-radius:8px;font-size:.85rem;margin-bottom:10px;}
+.msg-succes{background:#e5f2ea;color:var(--vert);padding:10px 14px;border-radius:8px;font-size:.85rem;margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="ecran-login">
+    <div class="login-panel">
+      <div class="login-brand">
+        <div class="login-badge">
+          <img src="./logo-emblem.png" alt="Fondation Arrawaj" width="34" height="34">
+        </div>
+        <div>
+          <div class="login-eyebrow">Fondation Arrawaj</div>
+          <h1>Relance Clients</h1>
+        </div>
+        <p class="login-tagline">La plateforme de suivi des campagnes de relance, de l'appel jusqu'au rendez-vous confirmé en agence.</p>
+        <ul class="login-features">
+          <li>File d'appel priorisée automatiquement</li>
+          <li>Suivi en temps réel par opérateur</li>
+          <li>Transmission des RDV en un clic</li>
+        </ul>
+      </div>
+      <div class="login-action">
+        <div id="login-zone-action">
+          <div class="login-loading"><div class="spinner"></div>Vérification de votre session...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   CONFIG — à ajuster une fois les tables Dataverse créées
+   ============================================================ */
+const MSAL_CONFIG = {
+  auth: {
+    clientId: "725c7e66-a235-4672-b09d-3eede78c1b1c",       // App CGA Arrawaj réutilisée
+    authority: "https://login.microsoftonline.com/93d6c57e-29a2-4b04-847c-6915c6a388a0",
+    redirectUri: "https://nekhamfindaj.github.io/Relance-Arrawaj/"
+  },
+  cache: { cacheLocation: "sessionStorage" }
+};
+const DATAVERSE_URL = "https://org18dd8097.crm4.dynamics.com";
+const DATAVERSE_SCOPE = `${DATAVERSE_URL}/.default`;
+
+// ⚠️ Noms de tables à confirmer après création manuelle dans Power Apps
+// (le nom pluriel exact dépend de la règle de pluralisation Dataverse — à vérifier dans "Détails de la table")
+const TABLES = {
+  clients: "cr2c5_arw_relance_clientses",
+  appels: "cr2c5_arw_appelses",
+  users: "cr2c5_arw_userses"
+};
+
+/* ============================================================
+   AUTH MSAL
+   ============================================================ */
+const msalInstance = new msal.PublicClientApplication(MSAL_CONFIG);
+let currentAccount = null;
+let currentUser = null; // { email, nom, role, agence }
+
+async function initAuth() {
+  try {
+    const resp = await Promise.race([
+      msalInstance.handleRedirectPromise(),
+      new Promise(res => setTimeout(() => res(null), 2000))
+    ]);
+    if (resp && resp.account) currentAccount = resp.account;
+  } catch (e) { console.error("Erreur redirect MSAL:", e); }
+
+  const accounts = msalInstance.getAllAccounts();
+  if (!currentAccount && accounts.length > 0) currentAccount = accounts[0];
+
+  if (currentAccount) {
+    await chargerProfilUtilisateur();
+  } else {
+    const zone = document.getElementById("login-zone-action");
+    zone.innerHTML = `
+      <img src="./logo-arrawaj.png" alt="Fondation Arrawaj" style="height:32px;width:auto;margin-bottom:6px;object-fit:contain;">
+      <p class="login-instruction">Connectez-vous avec votre compte professionnel</p>
+      <button class="btn login-btn" id="btn-login">
+        <svg width="17" height="17" viewBox="0 0 23 23"><rect width="10" height="10" x="1" y="1" fill="#f35325"/><rect width="10" height="10" x="12" y="1" fill="#81bc06"/><rect width="10" height="10" x="1" y="12" fill="#05a6f0"/><rect width="10" height="10" x="12" y="12" fill="#ffba08"/></svg>
+        Se connecter avec Microsoft
+      </button>
+      <p class="login-note">Accès réservé au personnel autorisé de la Fondation Arrawaj</p>
+    `;
+    document.getElementById("btn-login").addEventListener("click", () => {
+      msalInstance.loginRedirect({ scopes: [DATAVERSE_SCOPE] });
+    });
+  }
+}
+
+async function getToken() {
+  const req = { scopes: [DATAVERSE_SCOPE], account: currentAccount };
+  try {
+    const res = await msalInstance.acquireTokenSilent(req);
+    return res.accessToken;
+  } catch (e) {
+    const res = await msalInstance.acquireTokenRedirect(req);
+    return null; // redirection en cours
+  }
+}
+
+async function getGraphToken() {
+  const req = { scopes: ["User.ReadBasic.All"], account: currentAccount };
+  try {
+    const res = await msalInstance.acquireTokenSilent(req);
+    return res.accessToken;
+  } catch (e) {
+    const res = await msalInstance.acquireTokenRedirect(req);
+    return null; // redirection en cours
+  }
+}
+
+async function rechercherUtilisateursM365(query) {
+  const token = await getGraphToken();
+  const url = `https://graph.microsoft.com/v1.0/users?$search="displayName:${encodeURIComponent(query)}"&$select=displayName,mail,userPrincipalName&$top=8`;
+  const res = await fetch(url, {
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "ConsistencyLevel": "eventual"
+    }
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Graph ${res.status}: ${txt.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  return data.value || [];
+}
+
+async function dvFetch(path, options = {}) {
+  const token = await getToken();
+  const res = await fetch(`${DATAVERSE_URL}/api/data/v9.2/${path}`, {
+    ...options,
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+      "OData-MaxVersion": "4.0",
+      "OData-Version": "4.0",
+      "Accept": "application/json",
+      "Prefer": "odata.maxpagesize=500",
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Dataverse ${res.status}: ${txt.slice(0,200)}`);
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+async function chargerProfilUtilisateur() {
+  try {
+    const email = currentAccount.username.toLowerCase();
+    const data = await dvFetch(`${TABLES.users}?$filter=cr2c5_arw_email eq '${email}'`);
+    if (!data.value || data.value.length === 0) {
+      afficherErreurProfil(email);
+      return;
+    }
+    const u = data.value[0];
+    const roles = { 0: "admin", 1: "crc", 2: "dr", 3: "rga", 4: "ca" };
+    currentUser = {
+      id: u.cr2c5_arw_usersid,
+      email: u.cr2c5_arw_email,
+      nom: u.cr2c5_arw_nom,
+      role: roles[u.cr2c5_arw_role] || "crc",
+      agence: u.cr2c5_arw_agence,
+      direction: u.cr2c5_arw_direction,
+      quota: u.cr2c5_arw_quota_jour
+    };
+    demarrerApp();
+  } catch (e) {
+    console.error(e);
+    afficherErreurProfil(currentAccount.username);
+  }
+}
+
+function afficherErreurProfil(email) {
+  document.getElementById("app").innerHTML = `
+    <div id="ecran-login">
+      <div class="login-panel">
+        <div class="login-brand">
+          <div class="login-badge">
+            <img src="./logo-emblem.png" alt="Fondation Arrawaj" width="34" height="34">
+          </div>
+          <div>
+            <div class="login-eyebrow">Fondation Arrawaj</div>
+            <h1>Relance Clients</h1>
+          </div>
+          <p class="login-tagline">La plateforme de suivi des campagnes de relance, de l'appel jusqu'au rendez-vous confirmé en agence.</p>
+        </div>
+        <div class="login-action">
+          <p class="login-instruction">Profil introuvable</p>
+          <p class="login-note">Aucun utilisateur trouvé pour <strong>${email}</strong> dans la table des utilisateurs.<br>Contactez l'administrateur pour être ajouté.</p>
+          <button class="btn discret" onclick="location.reload()">Réessayer</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ============================================================
+   DÉMARRAGE APP — routage par rôle
+   ============================================================ */
+function demarrerApp() {
+  const app = document.getElementById("app");
+  app.innerHTML = `
+    <header>
+      <div class="titre"><img src="./logo-emblem.png" alt="" width="22" height="22" style="vertical-align:-5px;margin-right:6px;">Relance Clients <span class="role-badge">${currentUser.role}</span></div>
+      <div class="user-info">
+        <span>${currentUser.nom}</span>
+        <button class="btn-deco" id="btn-logout">Déconnexion</button>
+      </div>
+    </header>
+    <main id="zone-principale"></main>
+  `;
+  document.getElementById("btn-logout").addEventListener("click", () => msalInstance.logoutRedirect());
+
+  const zone = document.getElementById("zone-principale");
+  if (currentUser.role === "crc") renderEcranCRC(zone);
+  else if (currentUser.role === "admin") renderEcranAdmin(zone);
+  else if (currentUser.role === "dr") renderEcranDR(zone);
+  else renderEcranBientot(zone);
+}
+
+function renderEcranBientot(zone) {
+  zone.innerHTML = `<div class="msg-vide">Écran ${currentUser.role.toUpperCase()} — bientôt disponible (phase 2).</div>`;
+}
+
+/* ============================================================
+   ÉCRAN CRC — file du jour + recherche + saisie appel
+   ============================================================ */
+async function renderEcranCRC(zone) {
+  zone.innerHTML = `
+    <div id="tdb-crc"></div>
+    <nav class="tabs">
+      <button class="actif" data-tab="file">Ma file du jour</button>
+      <button data-tab="recherche">Recherche libre</button>
+    </nav>
+    <div id="contenu-crc"></div>
+  `;
+  chargerTDBCRC(document.getElementById("tdb-crc"));
+  const contenu = document.getElementById("contenu-crc");
+  const tabs = zone.querySelectorAll("nav.tabs button");
+  tabs.forEach(b => b.addEventListener("click", () => {
+    tabs.forEach(x => x.classList.remove("actif"));
+    b.classList.add("actif");
+    if (b.dataset.tab === "file") chargerFileDuJour(contenu);
+    else chargerRecherche(contenu);
+  }));
+  chargerFileDuJour(contenu);
+}
+
+async function chargerTDBCRC(container) {
+  container.innerHTML = `<div class="msg-vide">Chargement du tableau de bord...</div>`;
+  const debutJour = new Date(); debutJour.setHours(0, 0, 0, 0);
+  const debutJourISO = debutJour.toISOString();
+  try {
+    const [enFileData, appelsJourData, rdvJourData] = await Promise.all([
+      dvFetch(`${TABLES.clients}?$filter=_cr2c5_arw_operateur_assigne_value eq ${currentUser.id} and cr2c5_arw_statut eq 11&$select=cr2c5_arw_relance_clientsid`),
+      dvFetch(`${TABLES.appels}?$filter=cr2c5_arw_operateur eq '${currentUser.nom}' and cr2c5_arw_date_appel ge ${debutJourISO}&$select=cr2c5_arw_nature_appel,cr2c5_arw_resultat_argumente`),
+      dvFetch(`${TABLES.clients}?$filter=_cr2c5_arw_operateur_assigne_value eq ${currentUser.id} and cr2c5_arw_statut eq 16&$select=cr2c5_arw_relance_clientsid`)
+    ]);
+    const enFile = enFileData.value?.length || 0;
+    const appelsJour = appelsJourData.value || [];
+    const traites = appelsJour.length;
+    const argumentes = appelsJour.filter(a => a.cr2c5_arw_nature_appel === 100).length;
+    const rdvJour = rdvJourData.value?.length || 0;
+    const quota = currentUser.quota || 0;
+    const reste = quota > 0 ? Math.max(quota - traites, 0) : enFile;
+    const tauxArgumente = traites > 0 ? Math.round((argumentes / traites) * 100) : 0;
+    const tauxTransfo = argumentes > 0 ? Math.round((rdvJour / argumentes) * 100) : 0;
+    container.innerHTML = `
+      <div class="stat-grid">
+        <div class="stat"><div class="valeur">${enFile}</div><div class="label">En file actuellement</div></div>
+        <div class="stat"><div class="valeur">${traites}</div><div class="label">Traités aujourd'hui</div></div>
+        <div class="stat"><div class="valeur">${reste}</div><div class="label">Reste à faire</div></div>
+        <div class="stat"><div class="valeur">${tauxArgumente}%</div><div class="label">Taux argumenté</div></div>
+        <div class="stat"><div class="valeur">${rdvJour}</div><div class="label">RDV fixés (jour)</div></div>
+        <div class="stat"><div class="valeur">${tauxTransfo}%</div><div class="label">Taux de transformation</div></div>
+      </div>
+    `;
+  } catch (e) {
+    container.innerHTML = `<div class="msg-erreur">Erreur tableau de bord : ${e.message}</div>`;
+  }
+}
+
+async function chargerFileDuJour(contenu) {
+  contenu.innerHTML = `<div class="msg-vide">Chargement de votre file...</div>`;
+  const filtre = `_cr2c5_arw_operateur_assigne_value eq ${currentUser.id} and cr2c5_arw_statut eq 11`; // ATTRIBUE
+  try {
+    let data = await dvFetch(`${TABLES.clients}?$filter=${encodeURIComponent(filtre)}&$orderby=cr2c5_arw_finecheance asc`);
+    let liste = data.value || [];
+    const quota = currentUser.quota || 20;
+
+    if (liste.length < quota) {
+      contenu.innerHTML = `<div class="msg-vide">Attribution automatique des prochains clients...</div>`;
+      const aTirer = quota - liste.length;
+      const nouveaux = await fetchProchainsClientsPrioritaires(aTirer);
+      if (nouveaux.length > 0) {
+        await assignerClientsAMoi(nouveaux);
+        data = await dvFetch(`${TABLES.clients}?$filter=${encodeURIComponent(filtre)}&$orderby=cr2c5_arw_finecheance asc`);
+        liste = data.value || [];
+      }
+    }
+
+    if (liste.length === 0) {
+      contenu.innerHTML = `<div class="msg-vide">Aucun client disponible dans le pool actuellement.</div>`;
+      return;
+    }
+    contenu.innerHTML = liste.map(c => templateClientItem(c)).join("");
+    attacherEcoutesFiche(contenu, liste);
+  } catch (e) {
+    contenu.innerHTML = `<div class="msg-erreur">Erreur de chargement : ${e.message}</div>`;
+  }
+}
+
+/* Moteur de priorité : 1) rappels programmés aujourd'hui, 2) nouveaux appels (prêt actif,
+   trié par échéance proche + montant élevé), 3) nouveaux appels sur prêts déjà clôturés */
+async function fetchProchainsClientsPrioritaires(limite) {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  let resultats = [];
+
+  const t1 = await dvFetch(`${TABLES.clients}?$filter=(cr2c5_arw_statut eq 15 or cr2c5_arw_statut eq 12) and cr2c5_arw_date_rappel_prevue eq ${todayStr}&$orderby=cr2c5_arw_finecheance asc,cr2c5_arw_montantdeblocage desc&$top=${limite}`);
+  resultats = resultats.concat(t1.value || []);
+
+  if (resultats.length < limite) {
+    const reste = limite - resultats.length;
+    const t2 = await dvFetch(`${TABLES.clients}?$filter=cr2c5_arw_statut eq 10 and cr2c5_arw_finecheance ge ${todayStr}&$orderby=cr2c5_arw_finecheance asc,cr2c5_arw_montantdeblocage desc&$top=${reste}`);
+    resultats = resultats.concat(t2.value || []);
+  }
+
+  if (resultats.length < limite) {
+    const reste = limite - resultats.length;
+    const t3 = await dvFetch(`${TABLES.clients}?$filter=cr2c5_arw_statut eq 10 and cr2c5_arw_finecheance lt ${todayStr}&$orderby=cr2c5_arw_montantdeblocage desc&$top=${reste}`);
+    resultats = resultats.concat(t3.value || []);
+  }
+
+  return resultats.slice(0, limite);
+}
+
+async function assignerClientsAMoi(clients) {
+  for (const c of clients) {
+    await dvFetch(`${TABLES.clients}(${c.cr2c5_arw_relance_clientsid})`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        "cr2c5_arw_operateur_assigne@odata.bind": `/${TABLES.users}(${currentUser.id})`,
+        cr2c5_arw_statut: 11,
+        cr2c5_arw_date_attribution: new Date().toISOString()
+      })
+    });
+  }
+}
+
+function formatMontant(m) {
+  if (m === null || m === undefined || m === "") return "-";
+  return Number(m).toLocaleString('fr-FR', { maximumFractionDigits: 2 }) + " MAD";
+}
+
+function formatDateFr(d) {
+  if (!d) return "-";
+  return new Date(d).toLocaleDateString('fr-FR');
+}
+
+function templateClientItem(c) {
+  return `
+    <div class="client-item" data-id="${c.cr2c5_arw_relance_clientsid}">
+      <div>
+        <div class="nom">${c.cr2c5_arw_nomclient || ""} ${c.cr2c5_arw_prenomclient || ""}</div>
+        <div class="meta">${c.cr2c5_arw_agence || ""} · Échéance ${formatDateFr(c.cr2c5_arw_finecheance)} · <a class="tel-link" href="tel:${c.cr2c5_arw_gsm}">${c.cr2c5_arw_gsm || "-"}</a></div>
+      </div>
+      <button class="btn orange btn-traiter" data-id="${c.cr2c5_arw_relance_clientsid}">Traiter l'appel</button>
+    </div>`;
+}
+
+async function chargerRecherche(contenu) {
+  contenu.innerHTML = `
+    <div class="carte">
+      <label>Rechercher un client (nom, CIN ou n° demande)</label>
+      <input type="text" id="input-recherche" placeholder="Ex: NADI ou CB320282">
+      <button class="btn" id="btn-rechercher">Rechercher</button>
+    </div>
+    <div id="resultats-recherche"></div>
+  `;
+  document.getElementById("btn-rechercher").addEventListener("click", async () => {
+    const q = document.getElementById("input-recherche").value.trim();
+    const res = document.getElementById("resultats-recherche");
+    if (!q) return;
+    res.innerHTML = `<div class="msg-vide">Recherche...</div>`;
+    try {
+      const filtre = `contains(cr2c5_arw_nomclient,'${q}') or contains(cr2c5_arw_cin,'${q}') or contains(cr2c5_arw_numdemande,'${q}')`;
+      const data = await dvFetch(`${TABLES.clients}?$filter=${encodeURIComponent(filtre)}`);
+      if (!data.value || data.value.length === 0) {
+        res.innerHTML = `<div class="msg-vide">Aucun résultat.</div>`;
+        return;
+      }
+      res.innerHTML = data.value.map(c => templateClientItem(c)).join("");
+      attacherEcoutesFiche(res, data.value);
+    } catch (e) {
+      res.innerHTML = `<div class="msg-erreur">Erreur : ${e.message}</div>`;
+    }
+  });
+}
+
+function attacherEcoutesFiche(container, clients) {
+  container.querySelectorAll(".btn-traiter").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const c = clients.find(x => x.cr2c5_arw_relance_clientsid === btn.dataset.id);
+      ouvrirFormulaireAppel(c);
+    });
+  });
+}
+
+/* ============================================================
+   FORMULAIRE DE SAISIE APPEL — logique conditionnelle complète
+   ============================================================ */
+function ouvrirFormulaireAppel(client) {
+  const zone = document.getElementById("zone-principale");
+  const overlay = document.createElement("div");
+  overlay.innerHTML = `
+    <div class="carte">
+      <h2>${client.cr2c5_arw_nomclient} ${client.cr2c5_arw_prenomclient}</h2>
+      <p style="margin-bottom:10px;"><a class="tel-link" href="tel:${client.cr2c5_arw_gsm}">📞 ${client.cr2c5_arw_gsm}</a></p>
+
+      <div style="background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:.82rem;line-height:1.6;color:var(--texte-att);">
+        <div><strong style="color:var(--texte);">Région :</strong> ${client.cr2c5_arw_direction || "-"}</div>
+        <div><strong style="color:var(--texte);">Agence :</strong> ${client.cr2c5_arw_agence || "-"}</div>
+        <div><strong style="color:var(--texte);">Chargé de portefeuille :</strong> ${client.cr2c5_arw_agentdecredit || "-"}</div>
+        <div><strong style="color:var(--texte);">Montant débloqué :</strong> ${formatMontant(client.cr2c5_arw_montantdeblocage)}</div>
+        <div><strong style="color:var(--texte);">Dernière échéance :</strong> ${formatDateFr(client.cr2c5_arw_finecheance)}</div>
+        <div><strong style="color:var(--texte);">N° demande :</strong> ${client.cr2c5_arw_numdemande || "-"} · <strong style="color:var(--texte);">Activité :</strong> ${client.cr2c5_arw_activite || "-"}</div>
+        <div><strong style="color:var(--texte);">CIN :</strong> ${client.cr2c5_arw_cin || "-"} · <strong style="color:var(--texte);">Adresse :</strong> ${client.cr2c5_arw_adresse || "-"}</div>
+      </div>
+
+      <label>Nature de l'appel</label>
+      <div class="etapes" id="choix-nature">
+        <button data-val="NON_ARGUMENTE">Non argumenté</button>
+        <button data-val="ARGUMENTE">Argumenté</button>
+      </div>
+
+      <div id="zone-non-argumente" class="zone-detail hidden">
+        <label>Motif</label>
+        <select id="motif-non-argumente">
+          <option value="INJOIGNABLE">Client injoignable</option>
+          <option value="NUM_ERRONE">Numéro erroné</option>
+          <option value="NON_DISPONIBLE">Client non disponible</option>
+        </select>
+        <div id="zone-date-recontact" class="zone-detail hidden">
+          <label>Date de recontact</label>
+          <input type="date" id="input-date-recontact">
+        </div>
+      </div>
+
+      <div id="zone-argumente" class="zone-detail hidden">
+        <label>Résultat</label>
+        <div class="etapes" id="choix-resultat">
+          <button data-val="HORS_ZONE">Hors zone</button>
+          <button data-val="NON_ELIGIBLE">Non éligible</button>
+          <button data-val="INTERESSE">Intéressé</button>
+          <button data-val="NON_INTERESSE">Non intéressé</button>
+        </div>
+
+        <div id="detail-hors-zone" class="zone-detail hidden">
+          <label>Agence la plus proche du lieu de résidence</label>
+          <input type="text" id="input-agence-proche" placeholder="Nom de l'agence">
+        </div>
+
+        <div id="detail-non-eligible" class="zone-detail hidden">
+          <label>Motif de non-éligibilité</label>
+          <select id="motif-non-eligible">
+            <option value="AGE">Âge client</option>
+            <option value="BESOIN_HORS_OFFRE">Besoin de financement hors offre</option>
+            <option value="ACTIVITE_NON_ELIGIBLE">Activité non éligible</option>
+            <option value="AUTRE">Autre</option>
+          </select>
+        </div>
+
+        <div id="detail-interesse" class="zone-detail hidden">
+          <label>Délai d'intérêt</label>
+          <select id="delai-interet">
+            <option value="IMMEDIAT">Immédiatement</option>
+            <option value="1_MOIS">Dans 1 mois</option>
+            <option value="2_MOIS">Dans 2 mois</option>
+            <option value="3_MOIS">Dans 3 mois</option>
+          </select>
+          <div id="detail-rdv" class="zone-detail hidden">
+            <label>Date et heure du rendez-vous</label>
+            <input type="datetime-local" id="input-date-rdv">
+          </div>
+        </div>
+
+        <div id="detail-non-interesse" class="zone-detail hidden">
+          <label>Motif</label>
+          <select id="motif-non-interesse">
+            <option value="TARIFICATION">Offre / tarification</option>
+            <option value="PAS_BESOIN">Pas de besoin dans l'immédiat</option>
+            <option value="AUTRE">Autre</option>
+          </select>
+        </div>
+      </div>
+
+      <label>Commentaire libre</label>
+      <textarea id="commentaire-libre" rows="2"></textarea>
+
+      <div id="zone-erreur-form"></div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button class="btn discret" id="btn-annuler">Annuler</button>
+        <button class="btn orange" id="btn-valider">Enregistrer</button>
+      </div>
+    </div>
+  `;
+  zone.prepend(overlay);
+  overlay.scrollIntoView({ behavior: "smooth" });
+
+  let nature = null, resultat = null;
+  const q = sel => overlay.querySelector(sel);
+
+  q("#choix-nature").addEventListener("click", e => {
+    if (e.target.tagName !== "BUTTON") return;
+    nature = e.target.dataset.val;
+    q("#choix-nature").querySelectorAll("button").forEach(b => b.classList.remove("actif"));
+    e.target.classList.add("actif");
+    q("#zone-non-argumente").classList.toggle("hidden", nature !== "NON_ARGUMENTE");
+    q("#zone-argumente").classList.toggle("hidden", nature !== "ARGUMENTE");
+    if (nature === "NON_ARGUMENTE") toggleDateRecontact();
+  });
+
+  function toggleDateRecontact() {
+    const motif = q("#motif-non-argumente").value;
+    q("#zone-date-recontact").classList.toggle("hidden", motif === "NUM_ERRONE");
+  }
+  q("#motif-non-argumente").addEventListener("change", toggleDateRecontact);
+  toggleDateRecontact();
+
+  q("#choix-resultat").addEventListener("click", e => {
+    if (e.target.tagName !== "BUTTON") return;
+    resultat = e.target.dataset.val;
+    q("#choix-resultat").querySelectorAll("button").forEach(b => b.classList.remove("actif"));
+    e.target.classList.add("actif");
+    ["hors-zone","non-eligible","interesse","non-interesse"].forEach(id => {
+      q(`#detail-${id}`).classList.toggle("hidden", `${id.toUpperCase().replace(/-/g,'_')}` !== resultat);
+    });
+  });
+
+  q("#delai-interet").addEventListener("change", e => {
+    q("#detail-rdv").classList.toggle("hidden", e.target.value !== "IMMEDIAT");
+  });
+
+  q("#btn-annuler").addEventListener("click", () => overlay.remove());
+
+  q("#btn-valider").addEventListener("click", async () => {
+    const err = q("#zone-erreur-form");
+    err.innerHTML = "";
+    if (!nature) { err.innerHTML = `<div class="msg-erreur">Sélectionnez la nature de l'appel.</div>`; return; }
+    if (nature === "ARGUMENTE" && !resultat) { err.innerHTML = `<div class="msg-erreur">Sélectionnez un résultat.</div>`; return; }
+    if (nature === "NON_ARGUMENTE" && q("#motif-non-argumente").value !== "NUM_ERRONE" && !q("#input-date-recontact").value) {
+      err.innerHTML = `<div class="msg-erreur">Indiquez une date de recontact.</div>`; return;
+    }
+
+    try {
+      await enregistrerAppel(client, nature, resultat, overlay);
+      overlay.remove();
+      chargerFileDuJour(document.getElementById("contenu-crc"));
+    } catch (e) {
+      err.innerHTML = `<div class="msg-erreur">Erreur d'enregistrement : ${e.message}</div>`;
+    }
+  });
+}
+
+async function enregistrerAppel(client, nature, resultat, overlay) {
+  const q = sel => overlay.querySelector(sel);
+  const commentaire = q("#commentaire-libre").value;
+
+  // 1) Créer la ligne d'historique cr2c5_arw_appels
+  const appelBody = {
+    "cr2c5_arw_client@odata.bind": `/${TABLES.clients}(${client.cr2c5_arw_relance_clientsid})`,
+    cr2c5_arw_operateur: currentUser.nom,
+    cr2c5_arw_date_appel: new Date().toISOString(),
+    cr2c5_arw_nature_appel: nature === "ARGUMENTE" ? 100 : 101,
+    cr2c5_arw_commentaire: commentaire
+  };
+  if (nature === "NON_ARGUMENTE") {
+    appelBody.cr2c5_arw_motif_non_argumente = q("#motif-non-argumente").value;
+    if (q("#input-date-recontact").value) appelBody.cr2c5_arw_date_rdv = q("#input-date-recontact").value;
+  } else {
+    appelBody.cr2c5_arw_resultat_argumente = resultat;
+    if (resultat === "HORS_ZONE") appelBody.cr2c5_arw_agence_reaffectee = q("#input-agence-proche").value;
+    if (resultat === "NON_ELIGIBLE") appelBody.cr2c5_arw_motif_non_eligibilite = q("#motif-non-eligible").value;
+    if (resultat === "NON_INTERESSE") appelBody.cr2c5_arw_motif_non_interet = q("#motif-non-interesse").value;
+    if (resultat === "INTERESSE") {
+      appelBody.cr2c5_arw_delai_interet = q("#delai-interet").value;
+      if (q("#delai-interet").value === "IMMEDIAT") appelBody.cr2c5_arw_date_rdv = new Date(q("#input-date-rdv").value).toISOString();
+    }
+  }
+  await dvFetch(`${TABLES.appels}`, { method: "POST", body: JSON.stringify(appelBody) });
+
+  // 2) Mettre à jour le statut du client selon la logique métier
+  const updateBody = {};
+  if (nature === "NON_ARGUMENTE") {
+    updateBody.cr2c5_arw_nb_tentatives = (client.cr2c5_arw_nb_tentatives || 0) + 1;
+    updateBody.cr2c5_arw_statut = 12; // INJOIGNABLE / NON_DISPONIBLE
+    if (q("#motif-non-argumente").value !== "NUM_ERRONE") {
+      updateBody.cr2c5_arw_date_rappel_prevue = q("#input-date-recontact").value;
+      updateBody.cr2c5_arw_operateur_assigne = null; // libéré, repasse dans le pool prioritaire à la date de recontact
+    }
+  } else if (resultat === "HORS_ZONE") {
+    updateBody.cr2c5_arw_agence_reaffectee = q("#input-agence-proche").value;
+    updateBody.cr2c5_arw_statut = 13; // HORS_ZONE_REAFFECTE
+    updateBody.cr2c5_arw_operateur_assigne = null; // libéré pour réattribution
+  } else if (resultat === "NON_ELIGIBLE" || resultat === "NON_INTERESSE") {
+    updateBody.cr2c5_arw_statut = resultat === "NON_ELIGIBLE" ? 14 : 18; // CLOTURE négatif (NON_ELIGIBLE / NON_INTERESSE)
+  } else if (resultat === "INTERESSE") {
+    if (q("#delai-interet").value === "IMMEDIAT") {
+      updateBody.cr2c5_arw_statut = 16; // RDV_FIXE
+      updateBody.cr2c5_arw_date_rappel_prevue = null;
+    } else {
+      updateBody.cr2c5_arw_statut = 15; // INTERESSE_RAPPEL
+      const mois = { "1_MOIS": 1, "2_MOIS": 2, "3_MOIS": 3 }[q("#delai-interet").value];
+      const d = new Date(); d.setMonth(d.getMonth() + mois);
+      updateBody.cr2c5_arw_date_rappel_prevue = d.toISOString().slice(0,10);
+      updateBody.cr2c5_arw_operateur_assigne = null; // repasse dans le pool à échéance
+    }
+  }
+  await dvFetch(`${TABLES.clients}(${client.cr2c5_arw_relance_clientsid})`, { method: "PATCH", body: JSON.stringify(updateBody) });
+}
+
+/* ============================================================
+   ÉCRAN ADMIN — import + dashboard (à enrichir en phase suivante)
+   ============================================================ */
+function renderEcranAdmin(zone) {
+  zone.innerHTML = `
+    <div id="tdb-admin"></div>
+    <nav class="tabs">
+      <button class="actif" data-tab="import">Import clients</button>
+      <button data-tab="utilisateurs">Utilisateurs</button>
+      <button data-tab="crc">Contact clients</button>
+      <button data-tab="dr">RDV / Export</button>
+      <button data-tab="stats">Statistiques</button>
+    </nav>
+    <div id="contenu-admin"></div>
+  `;
+  chargerTDBGlobal(document.getElementById("tdb-admin"));
+  const contenu = document.getElementById("contenu-admin");
+  const tabs = zone.querySelectorAll("nav.tabs button");
+  const routes = {
+    import: renderOngletImport,
+    utilisateurs: renderOngletUtilisateurs,
+    crc: renderEcranCRC,
+    dr: renderEcranDR,
+    stats: renderOngletStats
+  };
+  tabs.forEach(b => b.addEventListener("click", () => {
+    tabs.forEach(x => x.classList.remove("actif"));
+    b.classList.add("actif");
+    routes[b.dataset.tab](contenu);
+  }));
+  renderOngletImport(contenu);
+}
+
+async function chargerTDBGlobal(container) {
+  container.innerHTML = `<div class="msg-vide">Chargement du tableau de bord...</div>`;
+  const debutJour = new Date(); debutJour.setHours(0, 0, 0, 0);
+  const debutJourISO = debutJour.toISOString();
+  try {
+    const [stockData, traitesJourData, rdvData, clotureData] = await Promise.all([
+      dvFetch(`${TABLES.clients}?$filter=cr2c5_arw_statut eq 10 or cr2c5_arw_statut eq 11 or cr2c5_arw_statut eq 12 or cr2c5_arw_statut eq 15&$select=cr2c5_arw_relance_clientsid`),
+      dvFetch(`${TABLES.appels}?$filter=cr2c5_arw_date_appel ge ${debutJourISO}&$select=cr2c5_arw_resultat_argumente`),
+      dvFetch(`${TABLES.clients}?$filter=cr2c5_arw_statut eq 16&$select=cr2c5_arw_relance_clientsid`),
+      dvFetch(`${TABLES.clients}?$filter=cr2c5_arw_statut eq 14 or cr2c5_arw_statut eq 18&$select=cr2c5_arw_relance_clientsid`)
+    ]);
+    const stock = stockData.value?.length || 0;
+    const traitesJour = traitesJourData.value?.length || 0;
+    const rdv = rdvData.value?.length || 0;
+    const cloture = clotureData.value?.length || 0;
+    const tauxTransfo = (rdv + cloture) > 0 ? Math.round((rdv / (rdv + cloture)) * 100) : 0;
+    container.innerHTML = `
+      <div class="stat-grid">
+        <div class="stat"><div class="valeur">${stock}</div><div class="label">Stock à traiter</div></div>
+        <div class="stat"><div class="valeur">${traitesJour}</div><div class="label">Appels aujourd'hui</div></div>
+        <div class="stat"><div class="valeur">${rdv}</div><div class="label">RDV en attente d'export</div></div>
+        <div class="stat"><div class="valeur">${cloture}</div><div class="label">Clôturés (total)</div></div>
+        <div class="stat"><div class="valeur">${tauxTransfo}%</div><div class="label">Taux de transformation</div></div>
+      </div>
+    `;
+  } catch (e) {
+    container.innerHTML = `<div class="msg-erreur">Erreur tableau de bord : ${e.message}</div>`;
+  }
+}
+
+function renderOngletImport(zone) {
+  zone.innerHTML = `
+    <div class="carte">
+      <h2>Import base clients</h2>
+      <label>Fichier Excel (structure standard)</label>
+      <input type="file" id="input-fichier" accept=".xlsx,.xls">
+      <button class="btn" id="btn-importer">Importer</button>
+      <div id="statut-import"></div>
+    </div>
+  `;
+  document.getElementById("btn-importer").addEventListener("click", importerFichierClients);
+}
+
+/* ============================================================
+   ONGLET UTILISATEURS — créer et lister les comptes
+   ============================================================ */
+const REGIONS_ARRAWAJ = [
+  "CENTRAL",
+  "R1-FES-TAOUNATE", "R2-SALE-ZEMMOUR", "R3- CASA SUD", "R4-TETOUAN",
+  "R5- DOUKKALA-ABDA", "R6-MARRAKECH-TANSIFT EL HAOUZ", "R7-ORIENTAL",
+  "R8- TADLA-BENI MELLAL", "R9- MEKNES-TAFILALT", "R10-SOUS-MASSA",
+  "R11-GHARB", "R12-CASA NORD", "R13-TANGER-LARACHE", "R14-RABAT-ZEAR", "R15- SUD"
+];
+
+let utilisateurM365Selectionne = null;
+
+async function renderOngletUtilisateurs(zone) {
+  utilisateurM365Selectionne = null;
+  zone.innerHTML = `
+    <div class="carte">
+      <h2>Ajouter un utilisateur</h2>
+      <label>Rechercher dans l'annuaire M365 (nom ou email)</label>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="u-recherche" placeholder="Ex: Hicham Nekhla" style="flex:1;">
+        <button class="btn discret" id="btn-chercher-m365" style="width:auto;white-space:nowrap;">Rechercher</button>
+      </div>
+      <div id="u-resultats-m365"></div>
+      <div id="u-selection-info" class="hidden msg-succes"></div>
+
+      <label style="margin-top:10px;">Rôle</label>
+      <select id="u-role">
+        <option value="0">Admin</option>
+        <option value="1" selected>Chargé CRC</option>
+        <option value="2">DR</option>
+        <option value="3">RGA</option>
+        <option value="4">CA</option>
+      </select>
+      <label>Direction / périmètre (DR : sa région — CRC : "CENTRAL" si non régionalisé)</label>
+      <select id="u-direction">
+        <option value="">—</option>
+        ${REGIONS_ARRAWAJ.map(r => `<option value="${r}">${r}</option>`).join("")}
+      </select>
+      <label>Agence (pour RGA/CA)</label>
+      <input type="text" id="u-agence">
+      <label>Quota journalier (pour CRC)</label>
+      <input type="number" id="u-quota" value="20">
+      <div id="msg-ajout-user"></div>
+      <button class="btn orange" id="btn-ajouter-user" disabled>Ajouter</button>
+    </div>
+    <div class="carte">
+      <h2>Utilisateurs existants</h2>
+      <div id="liste-users">Chargement...</div>
+    </div>
+  `;
+
+  document.getElementById("btn-chercher-m365").addEventListener("click", async () => {
+    const q = document.getElementById("u-recherche").value.trim();
+    const resDiv = document.getElementById("u-resultats-m365");
+    if (!q) return;
+    resDiv.innerHTML = `<div class="msg-vide">Recherche dans l'annuaire...</div>`;
+    try {
+      const utilisateurs = await rechercherUtilisateursM365(q);
+      if (utilisateurs.length === 0) { resDiv.innerHTML = `<div class="msg-vide">Aucun résultat.</div>`; return; }
+      resDiv.innerHTML = utilisateurs.map((u, i) => `
+        <div class="client-item" data-i="${i}" style="cursor:pointer;">
+          <div>
+            <div class="nom">${u.displayName}</div>
+            <div class="meta">${u.mail || u.userPrincipalName}</div>
+          </div>
+        </div>`).join("");
+      resDiv.querySelectorAll(".client-item").forEach(el => el.addEventListener("click", () => {
+        const u = utilisateurs[parseInt(el.dataset.i, 10)];
+        utilisateurM365Selectionne = { nom: u.displayName, email: (u.mail || u.userPrincipalName || "").toLowerCase() };
+        const info = document.getElementById("u-selection-info");
+        info.classList.remove("hidden");
+        info.innerHTML = `Sélectionné : <strong>${u.displayName}</strong> (${utilisateurM365Selectionne.email})`;
+        resDiv.innerHTML = "";
+        document.getElementById("btn-ajouter-user").disabled = false;
+      }));
+    } catch (e) {
+      resDiv.innerHTML = `<div class="msg-erreur">Erreur recherche M365 : ${e.message}</div>`;
+    }
+  });
+
+  document.getElementById("btn-ajouter-user").addEventListener("click", async () => {
+    const msg = document.getElementById("msg-ajout-user");
+    if (!utilisateurM365Selectionne) { msg.innerHTML = `<div class="msg-erreur">Sélectionnez d'abord un utilisateur dans l'annuaire.</div>`; return; }
+    try {
+      await dvFetch(`${TABLES.users}`, {
+        method: "POST",
+        body: JSON.stringify({
+          cr2c5_arw_nom: utilisateurM365Selectionne.nom,
+          cr2c5_arw_email: utilisateurM365Selectionne.email,
+          cr2c5_arw_role: parseInt(document.getElementById("u-role").value, 10),
+          cr2c5_arw_direction: document.getElementById("u-direction").value || null,
+          cr2c5_arw_agence: document.getElementById("u-agence").value.trim(),
+          cr2c5_arw_quota_jour: parseInt(document.getElementById("u-quota").value, 10) || null
+        })
+      });
+      msg.innerHTML = `<div class="msg-succes">Utilisateur ajouté.</div>`;
+      chargerListeUsers();
+    } catch (e) {
+      msg.innerHTML = `<div class="msg-erreur">Erreur : ${e.message}</div>`;
+    }
+  });
+  chargerListeUsers();
+}
+
+async function chargerListeUsers() {
+  const div = document.getElementById("liste-users");
+  if (!div) return;
+  try {
+    const data = await dvFetch(`${TABLES.users}?$select=cr2c5_arw_nom,cr2c5_arw_email,cr2c5_arw_role,cr2c5_arw_agence,cr2c5_arw_direction`);
+    const roles = { 0: "Admin", 1: "Chargé CRC", 2: "DR", 3: "RGA", 4: "CA" };
+    if (!data.value || data.value.length === 0) { div.innerHTML = `<div class="msg-vide">Aucun utilisateur.</div>`; return; }
+    div.innerHTML = data.value.map(u => `
+      <div class="client-item">
+        <div>
+          <div class="nom">${u.cr2c5_arw_nom}</div>
+          <div class="meta">${u.cr2c5_arw_email} · ${u.cr2c5_arw_direction || u.cr2c5_arw_agence || "-"}</div>
+        </div>
+        <span class="badge att">${roles[u.cr2c5_arw_role] ?? "?"}</span>
+      </div>`).join("");
+  } catch (e) {
+    div.innerHTML = `<div class="msg-erreur">Erreur : ${e.message}</div>`;
+  }
+}
+
+/* ============================================================
+   ONGLET STATISTIQUES — compteurs par statut
+   ============================================================ */
+async function renderOngletStats(zone) {
+  zone.innerHTML = `<div class="msg-vide">Chargement des statistiques...</div>`;
+  const statuts = {
+    10: "À traiter", 11: "Attribué", 12: "Injoignable", 13: "Hors zone réaffecté",
+    14: "Non éligible (clôturé)", 15: "Intéressé - rappel", 16: "RDV fixé",
+    17: "Exporté DR", 18: "Non intéressé (clôturé)"
+  };
+  try {
+    const compteurs = {};
+    for (const code of Object.keys(statuts)) {
+      const data = await dvFetch(`${TABLES.clients}?$filter=cr2c5_arw_statut eq ${code}&$select=cr2c5_arw_relance_clientsid`);
+      compteurs[code] = data.value ? data.value.length : 0;
+    }
+    zone.innerHTML = `
+      <div class="stat-grid">
+        ${Object.entries(statuts).map(([code, label]) => `
+          <div class="stat">
+            <div class="valeur">${compteurs[code]}</div>
+            <div class="label">${label}</div>
+          </div>`).join("")}
+      </div>
+    `;
+  } catch (e) {
+    zone.innerHTML = `<div class="msg-erreur">Erreur : ${e.message}</div>`;
+  }
+}
+
+async function importerFichierClients() {
+  const fichier = document.getElementById("input-fichier").files[0];
+  const statutDiv = document.getElementById("statut-import");
+  if (!fichier) { statutDiv.innerHTML = `<div class="msg-erreur">Sélectionnez un fichier.</div>`; return; }
+  statutDiv.innerHTML = `<div class="msg-vide">Lecture du fichier...</div>`;
+
+  const buf = await fichier.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array", cellDates: true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, { raw: true, defval: "" });
+
+  let importes = 0, doublons = 0, erreurs = 0;
+  for (const r of rows) {
+    try {
+      const body = {
+        cr2c5_arw_direction: r.DIRECTION, cr2c5_arw_directeursucursale: r.DIRECTEURSUCURSALE,
+        cr2c5_arw_codeagence: r.CODEAGENCE, cr2c5_arw_agence: r.AGENCE,
+        cr2c5_arw_codeagentcredit: r.CODEAGENTCREDIT, cr2c5_arw_agentdecredit: r.AGENTDECREDIT,
+        cr2c5_arw_numdemande: r.NUMDEMANDE, cr2c5_arw_idclient: r.IDCLIENT,
+        cr2c5_arw_nomclient: r.NOMCLIENT, cr2c5_arw_prenomclient: r.PRENOMCLIENT,
+        cr2c5_arw_adresse: r.ADRESSE, cr2c5_arw_gsm: String(r.GSM || ""), cr2c5_arw_cin: r.CIN,
+        cr2c5_arw_codesousproduit: r.CODESOUSPRODUIT,
+        cr2c5_arw_finecheance: r.FINECHEANCE instanceof Date ? r.FINECHEANCE.toISOString().slice(0,10) : null,
+        cr2c5_arw_montantdeblocage: r.MONTANTDEBLOCAGE, cr2c5_arw_terme: r.TERME, cr2c5_arw_mntecheance: r.MNTECHEANCE,
+        cr2c5_arw_activite: r["Activité"],
+        cr2c5_arw_agence_origine: r.AGENCE,
+        cr2c5_arw_statut: 10 // A_TRAITER
+      };
+      // Vérifier doublon par numéro de demande avant insertion
+      const existe = await dvFetch(`${TABLES.clients}?$filter=cr2c5_arw_numdemande eq '${r.NUMDEMANDE}'&$select=cr2c5_arw_relance_clientsid`);
+      if (existe.value && existe.value.length > 0) { doublons++; continue; }
+      await dvFetch(`${TABLES.clients}`, { method: "POST", body: JSON.stringify(body) });
+      importes++;
+    } catch (e) { erreurs++; console.error(e); }
+  }
+  statutDiv.innerHTML = `<div class="msg-succes">Import terminé : ${importes} client(s) importé(s), ${doublons} doublon(s) ignoré(s), ${erreurs} erreur(s).</div>`;
+}
+
+/* ============================================================
+   ÉCRAN DR — RDV fixés + export Excel
+   ============================================================ */
+async function renderEcranDR(zone) {
+  zone.innerHTML = `<div class="msg-vide">Chargement des rendez-vous...</div>`;
+  const filtreDirection = (currentUser.role === "dr" && currentUser.direction)
+    ? ` and cr2c5_arw_direction eq '${currentUser.direction}'` : "";
+  try {
+    const [dataRdv, dataExportes] = await Promise.all([
+      dvFetch(`${TABLES.clients}?$filter=cr2c5_arw_statut eq 16${filtreDirection}`),
+      dvFetch(`${TABLES.clients}?$filter=cr2c5_arw_statut eq 17${filtreDirection}&$select=cr2c5_arw_relance_clientsid`)
+    ]);
+    const liste = dataRdv.value || [];
+    const totalExportes = dataExportes.value?.length || 0;
+    const enteteDirection = (currentUser.role === "dr" && currentUser.direction) ? ` — ${currentUser.direction}` : "";
+    const tdb = `
+      <div class="stat-grid">
+        <div class="stat"><div class="valeur">${liste.length}</div><div class="label">RDV à transmettre${enteteDirection}</div></div>
+        <div class="stat"><div class="valeur">${totalExportes}</div><div class="label">Déjà exportés (total)</div></div>
+      </div>
+    `;
+    if (liste.length === 0) {
+      zone.innerHTML = tdb + `<div class="msg-vide">Aucun rendez-vous confirmé à transmettre pour le moment.</div>`;
+      return;
+    }
+    zone.innerHTML = tdb + `
+      <div class="carte">
+        <h2>Rendez-vous confirmés (${liste.length})</h2>
+        <button class="btn orange" id="btn-export">Télécharger la liste (Excel)</button>
+      </div>
+      <div id="liste-rdv"></div>
+    `;
+    document.getElementById("liste-rdv").innerHTML = liste.map(c => `
+      <div class="client-item">
+        <div>
+          <div class="nom">${c.cr2c5_arw_nomclient} ${c.cr2c5_arw_prenomclient} <span class="badge rdv">RDV</span></div>
+          <div class="meta">${c.cr2c5_arw_agence} · <a class="tel-link" href="tel:${c.cr2c5_arw_gsm}">${c.cr2c5_arw_gsm}</a></div>
+        </div>
+      </div>`).join("");
+
+    document.getElementById("btn-export").addEventListener("click", async () => {
+      const exportData = liste.map(c => ({
+        Agence: c.cr2c5_arw_agence, Client: `${c.cr2c5_arw_nomclient} ${c.cr2c5_arw_prenomclient}`,
+        GSM: c.cr2c5_arw_gsm, "N° demande": c.cr2c5_arw_numdemande, "Date RDV": c.cr2c5_arw_date_rdv
+      }));
+      const wsExport = XLSX.utils.json_to_sheet(exportData);
+      const wbExport = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wbExport, wsExport, "RDV");
+      XLSX.writeFile(wbExport, `RDV_Relance_${new Date().toISOString().slice(0,10)}.xlsx`);
+
+      // Marquer comme exportés
+      for (const c of liste) {
+        await dvFetch(`${TABLES.clients}(${c.cr2c5_arw_relance_clientsid})`, {
+          method: "PATCH",
+          body: JSON.stringify({ cr2c5_arw_statut: 17, cr2c5_arw_date_export_dr: new Date().toISOString() }) // EXPORTE_DR
+        });
+      }
+      renderEcranDR(zone);
+    });
+  } catch (e) {
+    zone.innerHTML = `<div class="msg-erreur">Erreur : ${e.message}</div>`;
+  }
+}
+
+initAuth();
+</script>
+</body>
+</html>
